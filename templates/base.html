@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}JAL Points Flight Search{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <span class="logo-icon">✈</span>
+        <span>JAL Points Search</span>
+      </a>
+      <nav>
+        <a href="/">New Search</a>
+        <a href="https://seats.aero/jalf" target="_blank" rel="noopener">seats.aero ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <p>
+      Data provided by <a href="https://seats.aero" target="_blank" rel="noopener">seats.aero</a>.
+      Award availability is cached and may not reflect real-time seat counts.
+      Always confirm on <a href="https://www.jal.co.jp" target="_blank" rel="noopener">JAL.co.jp</a> before booking.
+    </p>
+  </footer>
+</body>
+</html>

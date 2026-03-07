@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}JAL Points Flight Search – Find Award Seats{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+  <h1>Find JAL Award Flights</h1>
+  <p>Search US → Japan award availability using JAL Mileage Bank points via <a href="https://seats.aero" target="_blank" rel="noopener">seats.aero</a>.</p>
+</div>
+
+<div class="card search-card">
+  <form action="/search" method="get" id="search-form">
+
+    <div class="form-section">
+      <h2>Origin Airports <span class="hint">(US)</span></h2>
+      <div class="checkbox-grid">
+        {% for code, name in us_airports.items() %}
+        <label class="checkbox-label">
+          <input type="checkbox" name="origins" value="{{ code }}" checked />
+          <span class="airport-code">{{ code }}</span>
+          <span class="airport-name">{{ name.split('(')[0].strip() }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Destination Airports <span class="hint">(Japan)</span></h2>
+      <div class="checkbox-grid">
+        {% for code, name in japan_airports.items() %}
+        <label class="checkbox-label">
+          <input type="checkbox" name="destinations" value="{{ code }}" checked />
+          <span class="airport-code">{{ code }}</span>
+          <span class="airport-name">{{ name.split('(')[0].strip() }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-section half">
+        <h2>Date Range</h2>
+        <div class="date-row">
+          <label>
+            <span>From</span>
+            <input type="date" name="start_date" value="{{ start_default }}" min="{{ start_default }}" required />
+          </label>
+          <label>
+            <span>To</span>
+            <input type="date" name="end_date" value="{{ end_default }}" min="{{ start_default }}" required />
+          </label>
+        </div>
+        <p class="hint">Maximum 60-day window per search.</p>
+      </div>
+
+      <div class="form-section half">
+        <h2>Cabin Class</h2>
+        <div class="cabin-grid">
+          {% for code, label in cabin_labels.items() %}
+          <label class="checkbox-label cabin-label {% if code in ['J', 'F'] %}default-checked{% endif %}">
+            <input type="checkbox" name="cabins" value="{{ code }}"
+              {% if code in ['J', 'F'] %}checked{% endif %} />
+            <span class="cabin-badge cabin-{{ code }}">{{ code }}</span>
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Search Award Availability</button>
+    </div>
+
+  </form>
+</div>
+
+<div class="info-cards">
+  <div class="info-card">
+    <h3>How it works</h3>
+    <ol>
+      <li>Select your departure and arrival airports.</li>
+      <li>Choose a date range (up to 60 days).</li>
+      <li>Pick cabin classes to include.</li>
+      <li>Results come from seats.aero's cached JAL award data.</li>
+    </ol>
+  </div>
+  <div class="info-card">
+    <h3>JAL Mileage Bank award rates</h3>
+    <table class="rates-table">
+      <thead><tr><th>Cabin</th><th>US → Japan (one-way)</th></tr></thead>
+      <tbody>
+        <tr><td>Economy (Y)</td><td>~30,000 miles</td></tr>
+        <tr><td>Premium Eco (W)</td><td>~43,000 miles</td></tr>
+        <tr><td>Business (J)</td><td>~50,000 miles</td></tr>
+        <tr><td>First (F)</td><td>~80,000 miles</td></tr>
+      </tbody>
+    </table>
+    <p class="hint">Rates vary by season. Confirm on JAL.co.jp.</p>
+  </div>
+  <div class="info-card">
+    <h3>Tips</h3>
+    <ul>
+      <li>JAL releases award seats up to 360 days in advance.</li>
+      <li>HND (Haneda) has the most US connections.</li>
+      <li>Business &amp; First class awards are limited – search broadly.</li>
+      <li>Requires a <a href="https://seats.aero" target="_blank" rel="noopener">seats.aero Pro</a> API key.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

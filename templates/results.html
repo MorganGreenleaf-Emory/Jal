@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}JAL Award Results – {{ start_date }} to {{ end_date }}{% endblock %}
+
+{% block content %}
+<div class="results-header">
+  <div>
+    <h1>Award Availability</h1>
+    <p class="subtitle">
+      {% if origins|length == us_airports|length %}All US airports{% else %}{{ origins | join(', ') }}{% endif %}
+      →
+      {% if destinations|length == japan_airports|length %}All Japan airports{% else %}{{ destinations | join(', ') }}{% endif %}
+      &nbsp;|&nbsp; {{ start_date }} to {{ end_date }}
+      &nbsp;|&nbsp;
+      {% if cabins %}{{ cabins | map('upper') | join(', ') }}{% endif %}
+    </p>
+  </div>
+  <a href="/" class="btn-secondary">New Search</a>
+</div>
+
+{% if error %}
+<div class="alert alert-error">
+  <strong>Error:</strong> {{ error }}
+  {% if 'API key' in error %}
+  <br>Copy <code>.env.example</code> to <code>.env</code> and set your
+  <a href="https://seats.aero/account/api" target="_blank" rel="noopener">seats.aero API key</a>.
+  {% endif %}
+</div>
+
+{% elif results %}
+<div class="results-meta">
+  Found <strong>{{ results | length }}</strong> available award seat{% if results|length != 1 %}s{% endif %}.
+  <span class="hint">Sorted by date. Click a row to view booking options on JAL.co.jp.</span>
+</div>
+
+<!-- Summary tiles by cabin -->
+<div class="summary-tiles">
+  {% set cabin_counts = {} %}
+  {% for r in results %}
+    {% if r.cabin_code not in cabin_counts %}
+      {% set _ = cabin_counts.update({r.cabin_code: 0}) %}
+    {% endif %}
+    {% set _ = cabin_counts.update({r.cabin_code: cabin_counts[r.cabin_code] + 1}) %}
+  {% endfor %}
+  {% for code, count in cabin_counts.items() %}
+  <div class="tile cabin-tile cabin-{{ code }}">
+    <div class="tile-label">{{ cabin_labels.get(code, code) }}</div>
+    <div class="tile-value">{{ count }}</div>
+    <div class="tile-unit">result{% if count != 1 %}s{% endif %}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="table-wrapper">
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Route</th>
+        <th>Cabin</th>
+        <th>Miles</th>
+        <th>Seats</th>
+        <th>Book</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr class="result-row" data-avail-id="{{ r.availability_id }}">
+        <td class="col-date">{{ r.date }}</td>
+        <td class="col-route">
+          <span class="airport-tag">{{ r.origin }}</span>
+          <span class="arrow">→</span>
+          <span class="airport-tag">{{ r.destination }}</span>
+        </td>
+        <td class="col-cabin">
+          <span class="cabin-badge cabin-{{ r.cabin_code }}">{{ r.cabin_code }}</span>
+          {{ r.cabin }}
+        </td>
+        <td class="col-miles">
+          {% if r.miles %}
+          {{ "{:,}".format(r.miles | int) }}
+        {% else %}
+          —
+        {% endif %}
+        </td>
+        <td class="col-seats">
+          {% if r.remaining_seats %}{{ r.remaining_seats }}{% else %}—{% endif %}
+        </td>
+        <td class="col-book">
+          <a href="https://www.jal.co.jp/jp/en/jalmile/use/jal/inter/application.html"
+             target="_blank" rel="noopener" class="book-link">Book ↗</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">🔍</div>
+  <h2>No award seats found</h2>
+  <p>No JAL award availability for these routes, dates, and cabin classes.</p>
+  <ul>
+    <li>Try a wider date range or more airports.</li>
+    <li>Economy (Y) typically has more availability than Business/First.</li>
+    <li>Check again later – JAL releases seats on a rolling basis.</li>
+  </ul>
+  <a href="/" class="btn-primary">Modify Search</a>
+</div>
+{% endif %}
+
+<!-- Refine search panel -->
+{% if not error %}
+<details class="refine-panel">
+  <summary>Refine this search</summary>
+  <form action="/search" method="get">
+    <div class="refine-grid">
+      <div>
+        <h3>Origins</h3>
+        {% for code, name in us_airports.items() %}
+        <label class="checkbox-label small">
+          <input type="checkbox" name="origins" value="{{ code }}"
+            {% if code in origins %}checked{% endif %} />
+          {{ code }}
+        </label>
+        {% endfor %}
+      </div>
+      <div>
+        <h3>Destinations</h3>
+        {% for code, name in japan_airports.items() %}
+        <label class="checkbox-label small">
+          <input type="checkbox" name="destinations" value="{{ code }}"
+            {% if code in destinations %}checked{% endif %} />
+          {{ code }}
+        </label>
+        {% endfor %}
+      </div>
+      <div>
+        <h3>Dates</h3>
+        <label>From <input type="date" name="start_date" value="{{ start_date }}" /></label>
+        <label>To <input type="date" name="end_date" value="{{ end_date }}" /></label>
+      </div>
+      <div>
+        <h3>Cabins</h3>
+        {% for code, label in cabin_labels.items() %}
+        <label class="checkbox-label small">
+          <input type="checkbox" name="cabins" value="{{ code }}"
+            {% if code in cabins %}checked{% endif %} />
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <button type="submit" class="btn-primary">Update Results</button>
+  </form>
+</details>
+{% endif %}
+{% endblock %}
