@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}ATL → Tokyo Trip Finder · May 24 – Jun 9, 2026{% endblock %}
+
+{% block content %}
+<div class="atl-hero">
+  <div class="atl-hero-left">
+    <div class="atl-route-badge">
+      <span class="atl-airport">ATL</span>
+      <span class="atl-arrow">✈</span>
+      <span class="atl-airport">TYO</span>
+    </div>
+    <h1>Atlanta → Tokyo Trip Finder</h1>
+    <p class="atl-subtitle">May 24 – June 9, 2026 &nbsp;·&nbsp; JAL Mileage Bank Awards &amp; Zipair Cash Fares</p>
+  </div>
+  <div class="atl-hero-right">
+    <div class="atl-trip-info">
+      <div class="trip-stat">
+        <span class="trip-stat-label">Outbound</span>
+        <span class="trip-stat-value">May 24</span>
+      </div>
+      <div class="trip-stat-sep">→</div>
+      <div class="trip-stat">
+        <span class="trip-stat-label">Return</span>
+        <span class="trip-stat-value">Jun 9</span>
+      </div>
+      <div class="trip-stat-sep">·</div>
+      <div class="trip-stat">
+        <span class="trip-stat-label">Duration</span>
+        <span class="trip-stat-value">16 nights</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Search form -->
+<div class="card search-card atl-search-card">
+  <form action="/atl-tokyo/search" method="get" id="atl-search-form">
+
+    <div class="form-row">
+      <div class="form-section half">
+        <h2>Outbound Date <span class="hint">(ATL → Tokyo)</span></h2>
+        <div class="date-row">
+          <label>
+            <span>Depart</span>
+            <input type="date" name="outbound_date" value="{{ outbound_date }}" required />
+          </label>
+        </div>
+        <p class="hint">Searches ±2 days for more options.</p>
+      </div>
+      <div class="form-section half">
+        <h2>Return Date <span class="hint">(Tokyo → ATL)</span></h2>
+        <div class="date-row">
+          <label>
+            <span>Return</span>
+            <input type="date" name="return_date" value="{{ return_date }}" required />
+          </label>
+        </div>
+        <p class="hint">Searches ±2 days for more options.</p>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Cabin Classes</h2>
+      <div class="cabin-grid">
+        {% for code, label in cabin_labels.items() %}
+        <label class="checkbox-label cabin-label">
+          <input type="checkbox" name="cabins" value="{{ code }}" checked />
+          <span class="cabin-badge cabin-{{ code }}">{{ code }}</span>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary btn-large">Search Best Flights</button>
+    </div>
+  </form>
+</div>
+
+<!-- How it works / context -->
+<div class="info-cards">
+  <div class="info-card">
+    <h3>How This Works</h3>
+    <ol>
+      <li><strong>JAL Awards</strong>: Searches all ATL-friendly gateways (DFW, ORD, JFK, LAX…) for JAL award space via seats.aero.</li>
+      <li>Results are <strong>scored and ranked</strong> – First &gt; Business &gt; Economy, weighted by mileage cost and seat availability.</li>
+      <li><strong>Zipair</strong>: Shows direct booking links for the budget cash option (NRT↔LAX, SFO, IAH).</li>
+      <li>You book ATL→gateway separately (Delta/AA/United) then the gateway→Tokyo international award.</li>
+    </ol>
+  </div>
+
+  <div class="info-card">
+    <h3>Best ATL Gateways for JAL</h3>
+    <table class="rates-table">
+      <thead><tr><th>Gateway</th><th>ATL Connection</th><th>Quality</th></tr></thead>
+      <tbody>
+        {% for code, (score, dots, desc) in atl_connection_quality.items() %}
+        <tr>
+          <td><strong>{{ code }}</strong></td>
+          <td class="hint">{{ desc }}</td>
+          <td class="conn-dots conn-{{ score }}">{{ dots }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="info-card">
+    <h3>JAL Award Rates (One-Way)</h3>
+    <table class="rates-table">
+      <thead><tr><th>Cabin</th><th>Miles</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td><span class="cabin-badge cabin-F">F</span> First</td><td>~80,000</td><td class="value-high">Exceptional</td></tr>
+        <tr><td><span class="cabin-badge cabin-J">J</span> Business</td><td>~60,000</td><td class="value-high">Excellent</td></tr>
+        <tr><td><span class="cabin-badge cabin-W">W</span> Prem Eco</td><td>~43,000</td><td class="value-mid">Good</td></tr>
+        <tr><td><span class="cabin-badge cabin-Y">Y</span> Economy</td><td>~30,000</td><td class="value-ok">Fair</td></tr>
+      </tbody>
+    </table>
+    <p class="hint">Seasonal surcharges may apply. Confirm on JAL.co.jp.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>Zipair (Cash) Overview</h3>
+    {% for cabin_code, cabin in zipair_cabins.items() %}
+    <div class="zipair-cabin-row">
+      <span class="zipair-badge {{ cabin.color_class }}">{{ cabin.short }}</span>
+      <div>
+        <strong>{{ cabin.label }}</strong> · {{ cabin.price_range }}
+        <div class="hint">{{ cabin.description }}</div>
+      </div>
+    </div>
+    {% endfor %}
+    <p class="hint" style="margin-top:.75rem;">Zipair flies NRT↔LAX, NRT↔SFO, NRT↔IAH.</p>
+  </div>
+</div>
+{% endblock %}

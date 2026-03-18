@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}ATL → Tokyo Results · {{ outbound_date }} / {{ return_date }}{% endblock %}
+
+{% block content %}
+<!-- Page header -->
+<div class="results-header">
+  <div>
+    <h1>ATL → Tokyo Results</h1>
+    <p class="subtitle">
+      Outbound: <strong>{{ outbound_date }}</strong> &nbsp;·&nbsp;
+      Return: <strong>{{ return_date }}</strong> &nbsp;·&nbsp;
+      {% if cabins %}{{ cabins | map('upper') | join(', ') }}{% endif %}
+    </p>
+  </div>
+  <a href="/atl-tokyo" class="btn-secondary">Modify Search</a>
+</div>
+
+<!-- Best Pick box -->
+{% if best_pick %}
+{% set bp = best_pick.result %}
+<div class="best-pick-box">
+  <div class="best-pick-label">★ Best Award Pick</div>
+  <div class="best-pick-content">
+    <div class="best-pick-route">
+      <span class="airport-tag">{{ bp.origin }}</span>
+      <span class="arrow">→</span>
+      <span class="airport-tag">{{ bp.destination }}</span>
+    </div>
+    <div>
+      <span class="cabin-badge cabin-{{ bp.cabin_code }}">{{ bp.cabin_code }}</span>
+      <strong>{{ bp.cabin }}</strong>
+    </div>
+    <div class="best-pick-miles">
+      {% if bp.miles %}{{ "{:,}".format(bp.miles | int) }} miles{% else %}—{% endif %}
+    </div>
+    <div class="best-pick-date">{{ bp.date }}</div>
+    <div class="score-pill">Score {{ bp.value_score }}</div>
+    <a href="https://www.jal.co.jp/jp/en/jalmile/use/jal/inter/application.html"
+       target="_blank" rel="noopener" class="btn-primary btn-small">Book JAL ↗</a>
+  </div>
+  <p class="hint" style="margin-top:.5rem;">
+    Connect ATL → {{ bp.origin }} ({{ bp.get('conn_dots','') }}) then board JAL {{ bp.origin }} → {{ bp.destination }}.
+  </p>
+</div>
+{% endif %}
+
+<!-- ───── TABS ───── -->
+<div class="tabs" id="leg-tabs">
+  <button class="tab-btn active" onclick="showTab('outbound', this)">
+    ✈ Outbound — May 24
+    {% if outbound_results %}<span class="tab-count">{{ outbound_results|length }}</span>{% endif %}
+  </button>
+  <button class="tab-btn" onclick="showTab('return', this)">
+    ✈ Return — Jun 9
+    {% if return_results %}<span class="tab-count">{{ return_results|length }}</span>{% endif %}
+  </button>
+</div>
+
+<!-- ═══════════════ OUTBOUND LEG ═══════════════ -->
+<div id="tab-outbound" class="tab-pane active">
+
+  {% if outbound_error %}
+  <div class="alert alert-error">
+    <strong>Error (outbound):</strong> {{ outbound_error }}
+    {% if 'API key' in outbound_error %}
+    <br>Set your <a href="https://seats.aero/account/api" target="_blank" rel="noopener">seats.aero API key</a> in <code>.env</code>.
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- JAL Award section -->
+  <div class="section-header">
+    <h2><span class="source-badge source-jal">JAL Miles</span> Award Availability · ATL Gateways → Tokyo</h2>
+    <p class="hint">Sorted by value score (highest = best value per mile, best cabin, easiest ATL connection).</p>
+  </div>
+
+  {% if outbound_results %}
+  <div class="results-meta">
+    Found <strong>{{ outbound_results|length }}</strong> JAL award seat{% if outbound_results|length != 1 %}s{% endif %} near {{ outbound_date }}.
+  </div>
+
+  <!-- Summary tiles -->
+  <div class="summary-tiles">
+    {% set cabin_counts = {} %}
+    {% for r in outbound_results %}
+      {% if r.cabin_code not in cabin_counts %}{% set _ = cabin_counts.update({r.cabin_code: 0}) %}{% endif %}
+      {% set _ = cabin_counts.update({r.cabin_code: cabin_counts[r.cabin_code] + 1}) %}
+    {% endfor %}
+    {% for code, count in cabin_counts.items() %}
+    <div class="tile cabin-tile cabin-{{ code }}">
+      <div class="tile-label">{{ cabin_labels.get(code, code) }}</div>
+      <div class="tile-value">{{ count }}</div>
+      <div class="tile-unit">seat{% if count != 1 %}s{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="table-wrapper">
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th>Score</th>
+          <th>Date</th>
+          <th>Gateway → Tokyo</th>
+          <th>Cabin</th>
+          <th>Miles</th>
+          <th>Seats</th>
+          <th>ATL Connection</th>
+          <th>Book</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in outbound_results %}
+        <tr class="result-row {% if loop.first %}top-result{% endif %}">
+          <td class="col-score">
+            <div class="score-bar-wrap">
+              <div class="score-bar" style="width: {{ [r.value_score * 8, 100] | min }}%"></div>
+              <span class="score-val">{{ r.value_score }}</span>
+            </div>
+          </td>
+          <td class="col-date">{{ r.date }}</td>
+          <td class="col-route">
+            <span class="airport-tag">{{ r.origin }}</span>
+            <span class="arrow">→</span>
+            <span class="airport-tag">{{ r.destination }}</span>
+          </td>
+          <td class="col-cabin">
+            <span class="cabin-badge cabin-{{ r.cabin_code }}">{{ r.cabin_code }}</span>
+            {{ r.cabin }}
+          </td>
+          <td class="col-miles">
+            {% if r.miles %}{{ "{:,}".format(r.miles | int) }}{% else %}—{% endif %}
+          </td>
+          <td class="col-seats">{{ r.remaining_seats or '—' }}</td>
+          <td class="col-conn">
+            {% if r.get('conn_dots') %}
+            <span class="conn-dots conn-{{ r.conn_score }}">{{ r.conn_dots }}</span>
+            <span class="hint conn-hint">{{ r.conn_desc }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="col-book">
+            <a href="https://www.jal.co.jp/jp/en/jalmile/use/jal/inter/application.html"
+               target="_blank" rel="noopener" class="book-link">Book ↗</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif not outbound_error %}
+  <div class="empty-state compact">
+    <div class="empty-icon">🔍</div>
+    <h3>No JAL award seats found near {{ outbound_date }}</h3>
+    <p>Try adjusting the outbound date or checking back later.</p>
+  </div>
+  {% endif %}
+
+  <!-- Zipair Outbound section -->
+  <div class="section-header" style="margin-top:2.5rem;">
+    <h2><span class="source-badge source-zipair">Zipair Cash</span> Outbound Options · ATL → Tokyo via Zipair</h2>
+    <p class="hint">Connect ATL → Zipair gateway, then fly Zipair gateway → NRT. Book each leg separately.</p>
+  </div>
+  <div class="zipair-cards">
+    {% for opt in zipair_outbound %}
+    <div class="zipair-card">
+      <div class="zipair-card-route">
+        <span class="airport-tag">{{ opt.origin }}</span>
+        <span class="arrow">→</span>
+        <span class="airport-tag">{{ opt.destination }}</span>
+        <span class="flight-time hint">{{ opt.flight_time_hrs }}h flight</span>
+      </div>
+      <div class="zipair-card-meta">
+        <span class="hint">{{ opt.frequency }}</span>
+        <span class="conn-dots conn-{{ opt.atl_connection.connection_quality }}">
+          {{ ['●○○','●●○','●●●'][opt.atl_connection.connection_quality - 1] }}
+        </span>
+        <span class="hint">ATL → {{ opt.atl_connection.airport }}: ~{{ opt.atl_connection.typical_flight_time }}</span>
+      </div>
+      <div class="zipair-cabin-list">
+        {% for cabin_code in opt.cabins %}
+        {% set cabin = zipair_cabins[cabin_code] %}
+        <div class="zipair-cabin-item">
+          <span class="zipair-badge {{ cabin.color_class }}">{{ cabin.short }}</span>
+          <span>{{ cabin.label }}</span>
+          <span class="cabin-price">{{ cabin.price_range }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <a href="{{ opt.booking_url }}" target="_blank" rel="noopener" class="btn-zipair">
+        Search Zipair {{ opt.departure_date }} ↗
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ═══════════════ RETURN LEG ═══════════════ -->
+<div id="tab-return" class="tab-pane hidden">
+
+  {% if return_error %}
+  <div class="alert alert-error">
+    <strong>Error (return):</strong> {{ return_error }}
+  </div>
+  {% endif %}
+
+  <!-- JAL Award return section -->
+  <div class="section-header">
+    <h2><span class="source-badge source-jal">JAL Miles</span> Award Availability · Tokyo → ATL Gateways</h2>
+    <p class="hint">Fly JAL Tokyo → gateway, then connect gateway → ATL. Sorted by value score.</p>
+  </div>
+
+  {% if return_results %}
+  <div class="results-meta">
+    Found <strong>{{ return_results|length }}</strong> JAL award seat{% if return_results|length != 1 %}s{% endif %} near {{ return_date }}.
+  </div>
+  <div class="summary-tiles">
+    {% set cabin_counts2 = {} %}
+    {% for r in return_results %}
+      {% if r.cabin_code not in cabin_counts2 %}{% set _ = cabin_counts2.update({r.cabin_code: 0}) %}{% endif %}
+      {% set _ = cabin_counts2.update({r.cabin_code: cabin_counts2[r.cabin_code] + 1}) %}
+    {% endfor %}
+    {% for code, count in cabin_counts2.items() %}
+    <div class="tile cabin-tile cabin-{{ code }}">
+      <div class="tile-label">{{ cabin_labels.get(code, code) }}</div>
+      <div class="tile-value">{{ count }}</div>
+      <div class="tile-unit">seat{% if count != 1 %}s{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="table-wrapper">
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th>Score</th>
+          <th>Date</th>
+          <th>Tokyo → Gateway</th>
+          <th>Cabin</th>
+          <th>Miles</th>
+          <th>Seats</th>
+          <th>ATL Connection</th>
+          <th>Book</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in return_results %}
+        <tr class="result-row {% if loop.first %}top-result{% endif %}">
+          <td class="col-score">
+            <div class="score-bar-wrap">
+              <div class="score-bar" style="width: {{ [r.value_score * 8, 100] | min }}%"></div>
+              <span class="score-val">{{ r.value_score }}</span>
+            </div>
+          </td>
+          <td class="col-date">{{ r.date }}</td>
+          <td class="col-route">
+            <span class="airport-tag">{{ r.origin }}</span>
+            <span class="arrow">→</span>
+            <span class="airport-tag">{{ r.destination }}</span>
+          </td>
+          <td class="col-cabin">
+            <span class="cabin-badge cabin-{{ r.cabin_code }}">{{ r.cabin_code }}</span>
+            {{ r.cabin }}
+          </td>
+          <td class="col-miles">
+            {% if r.miles %}{{ "{:,}".format(r.miles | int) }}{% else %}—{% endif %}
+          </td>
+          <td class="col-seats">{{ r.remaining_seats or '—' }}</td>
+          <td class="col-conn">
+            {% if r.get('conn_dots') %}
+            <span class="conn-dots conn-{{ r.conn_score }}">{{ r.conn_dots }}</span>
+            <span class="hint conn-hint">{{ r.conn_desc }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="col-book">
+            <a href="https://www.jal.co.jp/jp/en/jalmile/use/jal/inter/application.html"
+               target="_blank" rel="noopener" class="book-link">Book ↗</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif not return_error %}
+  <div class="empty-state compact">
+    <div class="empty-icon">🔍</div>
+    <h3>No JAL award seats found near {{ return_date }}</h3>
+    <p>Try adjusting the return date or checking back later.</p>
+  </div>
+  {% endif %}
+
+  <!-- Zipair Return section -->
+  <div class="section-header" style="margin-top:2.5rem;">
+    <h2><span class="source-badge source-zipair">Zipair Cash</span> Return Options · Tokyo → ATL via Zipair</h2>
+    <p class="hint">Fly Zipair NRT → US gateway, then connect gateway → ATL. Budget-friendly cash option.</p>
+  </div>
+  <div class="zipair-cards">
+    {% for opt in zipair_return %}
+    <div class="zipair-card">
+      <div class="zipair-card-route">
+        <span class="airport-tag">{{ opt.origin }}</span>
+        <span class="arrow">→</span>
+        <span class="airport-tag">{{ opt.destination }}</span>
+        <span class="flight-time hint">{{ opt.flight_time_hrs }}h flight</span>
+      </div>
+      <div class="zipair-card-meta">
+        <span class="hint">{{ opt.frequency }}</span>
+        <span class="conn-dots conn-{{ opt.atl_connection.connection_quality }}">
+          {{ ['●○○','●●○','●●●'][opt.atl_connection.connection_quality - 1] }}
+        </span>
+        <span class="hint">{{ opt.atl_connection.airport }} → ATL: ~{{ opt.atl_connection.typical_flight_time }}</span>
+      </div>
+      <div class="zipair-cabin-list">
+        {% for cabin_code in opt.cabins %}
+        {% set cabin = zipair_cabins[cabin_code] %}
+        <div class="zipair-cabin-item">
+          <span class="zipair-badge {{ cabin.color_class }}">{{ cabin.short }}</span>
+          <span>{{ cabin.label }}</span>
+          <span class="cabin-price">{{ cabin.price_range }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <a href="{{ opt.booking_url }}" target="_blank" rel="noopener" class="btn-zipair">
+        Search Zipair {{ opt.departure_date }} ↗
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Refine panel -->
+<details class="refine-panel" style="margin-top:2rem;">
+  <summary>Adjust Dates &amp; Cabins</summary>
+  <form action="/atl-tokyo/search" method="get">
+    <div class="refine-grid">
+      <div>
+        <h3>Outbound Date</h3>
+        <label>Depart <input type="date" name="outbound_date" value="{{ outbound_date }}" /></label>
+      </div>
+      <div>
+        <h3>Return Date</h3>
+        <label>Return <input type="date" name="return_date" value="{{ return_date }}" /></label>
+      </div>
+      <div>
+        <h3>Cabins</h3>
+        {% for code, label in cabin_labels.items() %}
+        <label class="checkbox-label small">
+          <input type="checkbox" name="cabins" value="{{ code }}"
+            {% if code in cabins %}checked{% endif %} />
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <button type="submit" class="btn-primary">Update Results</button>
+  </form>
+</details>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}

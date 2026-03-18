@@ -9,14 +9,20 @@ Then open http://localhost:5000
 """
 
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 import seats_aero
+import zipair as zipair_mod
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# Hardcoded trip dates for the ATL→Tokyo trip
+ATL_TOKYO_OUTBOUND = date(2026, 5, 24)
+ATL_TOKYO_RETURN = date(2026, 6, 9)
+ATL_TOKYO_DESTINATIONS = ["HND", "NRT"]
 
 
 def parse_date(value: str, fallback: date) -> date:
@@ -119,6 +125,149 @@ def api_trip(availability_id: str):
         return jsonify({"ok": True, "data": trips})
     except RuntimeError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# ATL → Tokyo specialized routes
+# ---------------------------------------------------------------------------
+
+@app.route("/atl-tokyo")
+def atl_tokyo():
+    """Landing page for the ATL→Tokyo May 24–June 9 trip finder."""
+    outbound_date = parse_date(request.args.get("outbound_date"), ATL_TOKYO_OUTBOUND)
+    return_date = parse_date(request.args.get("return_date"), ATL_TOKYO_RETURN)
+    return render_template(
+        "atl_tokyo.html",
+        outbound_date=outbound_date.isoformat(),
+        return_date=return_date.isoformat(),
+        cabin_labels=seats_aero.CABIN_LABELS,
+        atl_gateways=seats_aero.ATL_GATEWAYS,
+        atl_connection_quality=seats_aero.ATL_CONNECTION_QUALITY,
+        zipair_cabins=zipair_mod.ZIPAIR_CABINS,
+    )
+
+
+@app.route("/atl-tokyo/search")
+def atl_tokyo_search():
+    """
+    Search JAL award availability for the ATL→Tokyo trip.
+
+    Searches all ATL-friendly gateways for both outbound and return legs,
+    scores each result, and returns the ranked list alongside Zipair options.
+    """
+    outbound_date = parse_date(request.args.get("outbound_date"), ATL_TOKYO_OUTBOUND)
+    return_date = parse_date(request.args.get("return_date"), ATL_TOKYO_RETURN)
+    cabins = request.args.getlist("cabins") or ["Y", "W", "J", "F"]
+    gateways = list(seats_aero.ATL_GATEWAYS.keys())
+
+    outbound_results, outbound_error = [], None
+    return_results, return_error = [], None
+
+    try:
+        outbound_results = seats_aero.search_availability(
+            origins=gateways,
+            destinations=ATL_TOKYO_DESTINATIONS,
+            start_date=outbound_date,
+            end_date=outbound_date + timedelta(days=2),
+            cabins=cabins,
+        )
+        # Attach value scores
+        for r in outbound_results:
+            r["value_score"] = seats_aero.value_score(r)
+            conn = seats_aero.ATL_CONNECTION_QUALITY.get(r["origin"])
+            if conn:
+                r["conn_score"], r["conn_dots"], r["conn_desc"] = conn
+        outbound_results.sort(key=lambda r: r["value_score"], reverse=True)
+    except (ValueError, RuntimeError) as e:
+        outbound_error = str(e)
+
+    try:
+        return_results = seats_aero.search_availability(
+            origins=ATL_TOKYO_DESTINATIONS,
+            destinations=gateways,
+            start_date=return_date,
+            end_date=return_date + timedelta(days=2),
+            cabins=cabins,
+        )
+        for r in return_results:
+            r["value_score"] = seats_aero.value_score(r)
+            conn = seats_aero.ATL_CONNECTION_QUALITY.get(r["destination"])
+            if conn:
+                r["conn_score"], r["conn_dots"], r["conn_desc"] = conn
+        return_results.sort(key=lambda r: r["value_score"], reverse=True)
+    except (ValueError, RuntimeError) as e:
+        return_error = str(e)
+
+    # Zipair options
+    zipair_outbound = zipair_mod.get_outbound_options(outbound_date)
+    zipair_return = zipair_mod.get_return_options(return_date)
+
+    # Best pick: highest scored result across both legs
+    best_pick = None
+    if outbound_results:
+        best_pick = {"direction": "outbound", "result": outbound_results[0]}
+
+    return render_template(
+        "atl_tokyo_results.html",
+        outbound_date=outbound_date.isoformat(),
+        return_date=return_date.isoformat(),
+        outbound_results=outbound_results,
+        return_results=return_results,
+        outbound_error=outbound_error,
+        return_error=return_error,
+        zipair_outbound=zipair_outbound,
+        zipair_return=zipair_return,
+        zipair_cabins=zipair_mod.ZIPAIR_CABINS,
+        cabin_labels=seats_aero.CABIN_LABELS,
+        atl_gateways=seats_aero.ATL_GATEWAYS,
+        atl_connection_quality=seats_aero.ATL_CONNECTION_QUALITY,
+        best_pick=best_pick,
+        cabins=cabins,
+    )
+
+
+@app.route("/api/atl-tokyo/search")
+def api_atl_tokyo_search():
+    """JSON endpoint for the ATL→Tokyo search."""
+    outbound_date = parse_date(request.args.get("outbound_date"), ATL_TOKYO_OUTBOUND)
+    return_date = parse_date(request.args.get("return_date"), ATL_TOKYO_RETURN)
+    cabins = request.args.getlist("cabins") or ["Y", "W", "J", "F"]
+    gateways = list(seats_aero.ATL_GATEWAYS.keys())
+
+    try:
+        outbound = seats_aero.search_availability(
+            origins=gateways,
+            destinations=ATL_TOKYO_DESTINATIONS,
+            start_date=outbound_date,
+            end_date=outbound_date + timedelta(days=2),
+            cabins=cabins,
+        )
+        for r in outbound:
+            r["value_score"] = seats_aero.value_score(r)
+        outbound.sort(key=lambda r: r["value_score"], reverse=True)
+
+        ret = seats_aero.search_availability(
+            origins=ATL_TOKYO_DESTINATIONS,
+            destinations=gateways,
+            start_date=return_date,
+            end_date=return_date + timedelta(days=2),
+            cabins=cabins,
+        )
+        for r in ret:
+            r["value_score"] = seats_aero.value_score(r)
+        ret.sort(key=lambda r: r["value_score"], reverse=True)
+
+        return jsonify({
+            "ok": True,
+            "outbound_count": len(outbound),
+            "return_count": len(ret),
+            "outbound": outbound,
+            "return": ret,
+            "zipair_outbound": zipair_mod.get_outbound_options(outbound_date),
+            "zipair_return": zipair_mod.get_return_options(return_date),
+        })
+    except (ValueError, RuntimeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
 
 
 if __name__ == "__main__":

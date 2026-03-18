@@ -41,6 +41,63 @@ CABIN_LABELS = {
     "F": "First",
 }
 
+# ---------------------------------------------------------------------------
+# ATL-specific data
+# ---------------------------------------------------------------------------
+
+# US gateways with JAL service to Tokyo AND good ATL connections
+# Excludes HNL (too long domestic connection for a Japan trip)
+ATL_GATEWAYS = {
+    "DFW": "Dallas-Fort Worth (DFW)",
+    "ORD": "Chicago O'Hare (ORD)",
+    "JFK": "New York JFK (JFK)",
+    "LAX": "Los Angeles (LAX)",
+    "SFO": "San Francisco (SFO)",
+    "BOS": "Boston (BOS)",
+    "SEA": "Seattle (SEA)",
+}
+
+# Connection quality from ATL to each gateway (dots label, description, score 1-3)
+ATL_CONNECTION_QUALITY = {
+    "DFW": (3, "●●●", "~2h 15m, 500+ monthly flights"),
+    "ORD": (3, "●●●", "~2h 10m, 500+ monthly flights"),
+    "JFK": (2, "●●○", "~2h 30m, 300+ monthly flights"),
+    "LAX": (2, "●●○", "~4h 30m, 350+ monthly flights"),
+    "SFO": (2, "●●○", "~5h 00m, frequent service"),
+    "BOS": (1, "●○○", "~2h 45m, limited direct service"),
+    "SEA": (1, "●○○", "~5h 30m, limited direct service"),
+}
+
+# ---------------------------------------------------------------------------
+# Value scoring
+# ---------------------------------------------------------------------------
+
+# Cabin rank weights: higher = more valuable per-mile
+_CABIN_RANK = {"Y": 1, "W": 2, "J": 4, "F": 6}
+
+# Connection quality bonus weight
+_CONN_BONUS = {3: 0.15, 2: 0.07, 1: 0.0}
+
+
+def value_score(result: dict) -> float:
+    """
+    Score an award result for the ATL→Tokyo use case.
+
+    Higher is better. Formula rewards:
+      - High cabin class (First > Business > Prem Eco > Economy)
+      - More remaining seats (easier to book)
+      - Better ATL gateway connection quality
+    """
+    miles = result.get("miles")
+    if not miles or miles <= 0:
+        return 0.0
+    rank = _CABIN_RANK.get(result.get("cabin_code", "Y"), 1)
+    seats = min(result.get("remaining_seats") or 1, 5)
+    conn_score, _, _ = ATL_CONNECTION_QUALITY.get(result.get("origin", ""), (2, "", ""))
+    conn_bonus = _CONN_BONUS.get(conn_score, 0.0)
+    base = (rank * 100_000) / miles
+    return round(base * (1 + seats * 0.05) * (1 + conn_bonus), 1)
+
 
 def _get_api_key() -> str:
     key = os.environ.get("SEATS_AERO_API_KEY", "")
